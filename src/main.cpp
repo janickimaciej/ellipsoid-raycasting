@@ -15,8 +15,8 @@ int main()
 {
 	using namespace std::chrono_literals;
 
-	int initialWindowWidth = 1200;
-	int initialWindowHeight = 700;
+	constexpr int initialWindowWidth = 1200;
+	constexpr int initialWindowHeight = 700;
 	Scene scene{initialWindowWidth, initialWindowHeight};
 	Texture texture{initialWindowWidth, initialWindowHeight};
 	Window window{initialWindowWidth, initialWindowHeight, scene, texture};
