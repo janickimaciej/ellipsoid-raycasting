@@ -24,13 +24,13 @@
     <ClCompile Include="src\window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\shader_program.cpp">
+    <ClCompile Include="src\shaderProgram.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\scene.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\canvas.cpp">
+    <ClCompile Include="src\quad.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\texture.cpp">
@@ -69,21 +69,24 @@
     <ClCompile Include="dep\imgui\misc\cpp\imgui_stdlib.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\gui.cpp">
+    <ClCompile Include="src\gui\gui.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\gui\leftPanel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\shaderPrograms.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\window_user_data.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\window.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\shader_program.hpp">
+    <ClInclude Include="src\shaderProgram.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\canvas.hpp">
+    <ClInclude Include="src\quad.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\scene.hpp">
@@ -128,13 +131,19 @@
     <ClInclude Include="dep\imgui\misc\cpp\imgui_stdlib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\gui.hpp">
+    <ClInclude Include="src\gui\gui.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gui\leftPanel.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\shaderPrograms.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="src\vertex_shader.glsl" />
-    <None Include="src\fragment_shader.glsl" />
+    <None Include="src\shaders\quadVS.glsl" />
+    <None Include="src\shaders\quadFS.glsl" />
     <None Include="dep\imgui\misc\debuggers\imgui.natstepfilter" />
   </ItemGroup>
   <ItemGroup>

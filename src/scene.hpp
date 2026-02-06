@@ -1,8 +1,8 @@
 #pragma once
 
-#include "canvas.hpp"
 #include "camera.hpp"
 #include "ellipsoid.hpp"
+#include "quad.hpp"
 #include "texture.hpp"
 
 #include <glm/glm.hpp>
@@ -13,51 +13,56 @@
 class Scene
 {
 public:
-	Scene(int initialWidth, int initialHeight);
-	bool renderToTexture(Texture& texture);
-	void addElevation(float elevationRad);
-	void addAzimuth(float azimuthRad);
-	void addRadius(float radius);
-	void moveX(float x);
-	void moveY(float y);
-	void zoom(float zoom);
-	void rescale(int width, int height);
+	Scene(const glm::ivec2& viewportSize);
 
-	int getMaxPixelSizeExponent() const;
+	void render();
+	void updateViewportSize();
+
+	void moveXCamera(float x);
+	void moveYCamera(float y);
+	void addPitchCamera(float pitchRad);
+	void addYawCamera(float yawRad);
+	void zoomCamera(float zoom);
+
+	int getAccuracy() const;
+	void setAccuracy(int maxPixelSizeExponent);
 	float getViewWidth() const;
-	float getAmbient() const;
-	float getDiffuse() const;
-	float getSpecular() const;
-	float getShininess() const;
-	float getA() const;
-	float getB() const;
-	float getC() const;
-
-	void setMaxPixelSizeExponent(int maxPixelSizeExponent);
 	void setViewWidth(float viewWidth);
+
+	float getAmbient() const;
 	void setAmbient(float ambient);
+	float getDiffuse() const;
 	void setDiffuse(float diffuse);
+	float getSpecular() const;
 	void setSpecular(float specular);
+	float getShininess() const;
 	void setShininess(float shininess);
-	void setA(float a);
-	void setB(float b);
-	void setC(float c);
+
+	float getEllipsoidA() const;
+	void setEllipsoidA(float a);
+	float getEllipsoidB() const;
+	void setEllipsoidB(float b);
+	float getEllipsoidC() const;
+	void setEllipsoidC(float c);
 
 private:
+	const glm::ivec2& m_viewportSize;
+	Camera m_camera;
+	Ellipsoid m_ellipsoid{4.0f, 2.0f, 8.0f};
+	Quad m_quad{};
+	Texture m_texture;
+
 	static constexpr int m_numOfChannels = 3;
 	int m_maxPixelSizeExponent = 4;
-	int m_pixelSize{};
-	int m_width{};
-	int m_height{};
+	int m_pixelSize = getMaxPixelSize();
 	std::vector<unsigned char> m_cpuTexture{};
-	Ellipsoid m_ellipsoid{4.0f, 2.0f, 8.0f};
-	Camera m_camera;
 
 	void refresh();
 	void draw();
-	glm::ivec3 calcColor(const glm::mat4& cameraEllipsoidMatrix, float x, float y) const;
+	glm::ivec3 calcColor(const glm::vec3& cameraPos, const glm::mat4& cameraMatrix,
+		const glm::mat4& cameraEllipsoidMatrix, float x, float y) const;
 	std::optional<float> calcIntersection(float x, float y,
 		const glm::mat4& cameraEllipsoidMatrix) const;
-	glm::ivec3 calcPhong(const glm::vec3& point) const;
+	glm::ivec3 calcPhong(const glm::vec3& point, const glm::vec3& cameraPos) const;
 	int getMaxPixelSize() const;
 };

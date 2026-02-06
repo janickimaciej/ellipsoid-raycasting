@@ -1,84 +1,95 @@
 #include "scene.hpp"
 
 #include "material.hpp"
+#include "shaderPrograms.hpp"
 
-#include <glm/glm.hpp>
+#include <glad/glad.h>
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 
-constexpr float viewWidth = 20.0f;
 constexpr float nearPlane = 0.0f;
 constexpr float farPlane = 1000.0f;
+constexpr float initViewWidth = 20.0f;
 
-Scene::Scene(int initialWidth, int initialHeight) :
-	m_pixelSize{getMaxPixelSize()},
-	m_width{initialWidth},
-	m_height{initialHeight},
-	m_cpuTexture(m_numOfChannels * initialWidth * initialHeight, 0),
-	m_camera{viewWidth, static_cast<float>(initialWidth) / initialHeight, nearPlane, farPlane}
-{ }
-
-bool Scene::renderToTexture(Texture& texture)
+Scene::Scene(const glm::ivec2& viewportSize) :
+	m_viewportSize{viewportSize},
+	m_camera{viewportSize, nearPlane, farPlane, initViewWidth},
+	m_texture{viewportSize},
+	m_cpuTexture(m_numOfChannels * viewportSize.x * viewportSize.y, 0)
 {
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_MULTISAMPLE);
+}
+
+void Scene::render()
+{
+	static constexpr glm::vec3 backgroundColor{0.1f, 0.1f, 0.1f};
+	glClearColor(backgroundColor.r, backgroundColor.g, backgroundColor.b, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 	if (m_pixelSize > 0)
 	{
 		draw();
-		texture.overwrite(m_cpuTexture);
+		m_texture.overwrite(m_cpuTexture);
 		m_pixelSize /= 2;
-		return true;
 	}
-	return false;
+
+	m_texture.use();
+	ShaderPrograms::quad->use();
+	m_quad.render();
 }
 
-void Scene::addElevation(float elevationRad)
+void Scene::updateViewportSize()
 {
-	m_camera.addElevation(elevationRad);
+	m_camera.updateViewportSize();
+	m_texture.rescale(m_viewportSize);
+	m_cpuTexture =
+		std::vector<unsigned char>(m_numOfChannels * m_viewportSize.x * m_viewportSize.y, 0);
 	refresh();
 }
 
-void Scene::addAzimuth(float azimuthRad)
-{
-	m_camera.addAzimuth(azimuthRad);
-	refresh();
-}
-
-void Scene::addRadius(float radius)
-{
-	m_camera.addRadius(radius);
-	refresh();
-}
-
-void Scene::moveX(float x)
+void Scene::moveXCamera(float x)
 {
 	m_camera.moveX(x);
 	refresh();
 }
 
-void Scene::moveY(float y)
+void Scene::moveYCamera(float y)
 {
 	m_camera.moveY(y);
 	refresh();
 }
 
-void Scene::zoom(float zoom)
+void Scene::addPitchCamera(float pitchRad)
+{
+	m_camera.addPitch(pitchRad);
+	refresh();
+}
+
+void Scene::addYawCamera(float yawRad)
+{
+	m_camera.addYaw(yawRad);
+	refresh();
+}
+
+void Scene::zoomCamera(float zoom)
 {
 	m_camera.zoom(zoom);
 	refresh();
 }
 
-void Scene::rescale(int width, int height)
-{
-	m_width = width;
-	m_height = height;
-	m_cpuTexture = std::vector<unsigned char>(m_numOfChannels * width * height, 0);
-	m_camera.setAspectRatio(static_cast<float>(width) / height);
-	refresh();
-}
-
-int Scene::getMaxPixelSizeExponent() const
+int Scene::getAccuracy() const
 {
 	return m_maxPixelSizeExponent;
+}
+
+void Scene::setAccuracy(int maxPixelSizeExponent)
+{
+	m_maxPixelSizeExponent = maxPixelSizeExponent;
+	refresh();
 }
 
 float Scene::getViewWidth() const
@@ -86,9 +97,23 @@ float Scene::getViewWidth() const
 	return m_camera.getViewWidth();
 }
 
+void Scene::setViewWidth(float viewWidth)
+{
+	m_camera.setViewWidth(viewWidth);
+	refresh();
+}
+
 float Scene::getAmbient() const
 {
 	return m_ellipsoid.getMaterial().ambientCoef;
+}
+
+void Scene::setAmbient(float ambient)
+{
+	Material material = m_ellipsoid.getMaterial();
+	material.ambientCoef = ambient;
+	m_ellipsoid.setMaterial(material);
+	refresh();
 }
 
 float Scene::getDiffuse() const
@@ -96,9 +121,25 @@ float Scene::getDiffuse() const
 	return m_ellipsoid.getMaterial().diffuseCoef;
 }
 
+void Scene::setDiffuse(float diffuse)
+{
+	Material material = m_ellipsoid.getMaterial();
+	material.diffuseCoef = diffuse;
+	m_ellipsoid.setMaterial(material);
+	refresh();
+}
+
 float Scene::getSpecular() const
 {
 	return m_ellipsoid.getMaterial().specularCoef;
+}
+
+void Scene::setSpecular(float specular)
+{
+	Material material = m_ellipsoid.getMaterial();
+	material.specularCoef = specular;
+	m_ellipsoid.setMaterial(material);
+	refresh();
 }
 
 float Scene::getShininess() const
@@ -106,108 +147,45 @@ float Scene::getShininess() const
 	return m_ellipsoid.getMaterial().shininess;
 }
 
-float Scene::getA() const
+void Scene::setShininess(float shininess)
+{
+	Material material = m_ellipsoid.getMaterial();
+	material.shininess = shininess;
+	m_ellipsoid.setMaterial(material);
+	refresh();
+}
+
+float Scene::getEllipsoidA() const
 {
 	return m_ellipsoid.getA();
 }
 
-float Scene::getB() const
+void Scene::setEllipsoidA(float a)
+{
+	m_ellipsoid.setA(a);
+	refresh();
+}
+
+float Scene::getEllipsoidB() const
 {
 	return m_ellipsoid.getB();
 }
 
-float Scene::getC() const
+void Scene::setEllipsoidB(float b)
+{
+	m_ellipsoid.setB(b);
+	refresh();
+}
+
+float Scene::getEllipsoidC() const
 {
 	return m_ellipsoid.getC();
 }
 
-void Scene::setMaxPixelSizeExponent(int maxPixelSizeExponent)
+void Scene::setEllipsoidC(float c)
 {
-	if (maxPixelSizeExponent != m_maxPixelSizeExponent)
-	{
-		m_maxPixelSizeExponent = maxPixelSizeExponent;
-		refresh();
-	}
-}
-
-void Scene::setViewWidth(float viewWidth)
-{
-	if (viewWidth != m_camera.getViewWidth())
-	{
-		m_camera.setViewWidth(viewWidth);
-		refresh();
-	}
-}
-
-void Scene::setAmbient(float ambient)
-{
-	Material material = m_ellipsoid.getMaterial();
-	if (ambient != material.ambientCoef)
-	{
-		material.ambientCoef = ambient;
-		m_ellipsoid.setMaterial(material);
-		refresh();
-	}
-}
-
-void Scene::setDiffuse(float diffuse)
-{
-	Material material = m_ellipsoid.getMaterial();
-	if (diffuse != material.diffuseCoef)
-	{
-		material.diffuseCoef = diffuse;
-		m_ellipsoid.setMaterial(material);
-		refresh();
-	}
-}
-
-void Scene::setSpecular(float specular)
-{
-	Material material = m_ellipsoid.getMaterial();
-	if (specular != material.specularCoef)
-	{
-		material.specularCoef = specular;
-		m_ellipsoid.setMaterial(material);
-		refresh();
-	}
-}
-
-void Scene::setShininess(float shininess)
-{
-	Material material = m_ellipsoid.getMaterial();
-	if (shininess != material.shininess)
-	{
-		material.shininess = shininess;
-		m_ellipsoid.setMaterial(material);
-		refresh();
-	}
-}
-
-void Scene::setA(float a)
-{
-	if (a != m_ellipsoid.getA())
-	{
-		m_ellipsoid.setA(a);
-		refresh();
-	}
-}
-
-void Scene::setB(float b)
-{
-	if (b != m_ellipsoid.getB())
-	{
-		m_ellipsoid.setB(b);
-		refresh();
-	}
-}
-
-void Scene::setC(float c)
-{
-	if (c != m_ellipsoid.getC())
-	{
-		m_ellipsoid.setC(c);
-		refresh();
-	}
+	m_ellipsoid.setC(c);
+	refresh();
 }
 
 void Scene::refresh()
@@ -217,18 +195,19 @@ void Scene::refresh()
 
 void Scene::draw()
 {
-	glm::mat4 cameraMatrix = m_camera.getProjectionViewMatrixInverse();
+	glm::vec3 cameraPos = m_camera.getPos();
+	glm::mat4 cameraMatrix = m_camera.getMatrixInverse();
 	glm::mat4 cameraEllipsoidMatrix =
 		glm::transpose(cameraMatrix) * m_ellipsoid.getMatrix() * cameraMatrix;
 
 	const int halfPixelSize = m_pixelSize / 2;
-	bool isRowNumEven = true;
-	for (int centerY = 0; centerY < m_height + halfPixelSize;
-		centerY += m_pixelSize, isRowNumEven = !isRowNumEven)
+	bool isRowIndexEven = true;
+	for (int centerY = 0; centerY < m_viewportSize.y + halfPixelSize;
+		centerY += m_pixelSize, isRowIndexEven = !isRowIndexEven)
 	{
 		int start{};
 		int increment{};
-		if (m_pixelSize != getMaxPixelSize() && isRowNumEven)
+		if (m_pixelSize != getMaxPixelSize() && isRowIndexEven)
 		{
 			start = m_pixelSize;
 			increment = 2 * m_pixelSize;
@@ -239,23 +218,25 @@ void Scene::draw()
 			increment = m_pixelSize;
 		}
 
-		for (int centerX = start; centerX < m_width + halfPixelSize; centerX += increment)
+		for (int centerX = start; centerX < m_viewportSize.x + halfPixelSize; centerX += increment)
 		{
-			glm::ivec3 color = calcColor(cameraEllipsoidMatrix,
-				2 * static_cast<float>(centerX) / m_width - 1,
-				2 * static_cast<float>(centerY) / m_height - 1);
+			glm::ivec3 color = calcColor(cameraPos, cameraMatrix, cameraEllipsoidMatrix,
+				2 * static_cast<float>(centerX) / m_viewportSize.x - 1,
+				2 * static_cast<float>(centerY) / m_viewportSize.y - 1);
 
 			int startY = std::max(centerY - halfPixelSize, 0);
-			int endY = std::min(centerY + (halfPixelSize != 0 ? halfPixelSize : 1), m_height);
-			for (int y = startY; y < endY; ++y)
+			int endY =
+				std::min(centerY + (halfPixelSize != 0 ? halfPixelSize : 1), m_viewportSize.y);
+			for (std::size_t y = startY; y < endY; ++y)
 			{
 				int startX = std::max(centerX - halfPixelSize, 0);
-				int endX = std::min(centerX + (halfPixelSize != 0 ? halfPixelSize : 1), m_width);
-				for (int x = startX; x < endX; ++x)
+				int endX =
+					std::min(centerX + (halfPixelSize != 0 ? halfPixelSize : 1), m_viewportSize.x);
+				for (std::size_t x = startX; x < endX; ++x)
 				{
 					for (int channel = 0; channel < m_numOfChannels; ++channel)
 					{
-						m_cpuTexture[(y * m_width + x) * m_numOfChannels + channel] =
+						m_cpuTexture[(y * m_viewportSize.x + x) * m_numOfChannels + channel] =
 							static_cast<unsigned char>(color[channel]);
 					}
 				}
@@ -264,7 +245,8 @@ void Scene::draw()
 	}
 }
 
-glm::ivec3 Scene::calcColor(const glm::mat4& cameraEllipsoidMatrix, float x, float y) const
+glm::ivec3 Scene::calcColor(const glm::vec3& cameraPos, const glm::mat4& cameraMatrix,
+	const glm::mat4& cameraEllipsoidMatrix, float x, float y) const
 {
 	std::optional<float> z = calcIntersection(x, y, cameraEllipsoidMatrix);
 	constexpr glm::ivec3 background{30, 30, 30};
@@ -273,7 +255,7 @@ glm::ivec3 Scene::calcColor(const glm::mat4& cameraEllipsoidMatrix, float x, flo
 		return background;
 	}
 
-	return calcPhong(glm::vec3{m_camera.getProjectionViewMatrixInverse() * glm::vec4{x, y, *z, 1}});
+	return calcPhong(glm::vec3{cameraMatrix * glm::vec4{x, y, *z, 1}}, cameraPos);
 }
 
 std::optional<float> Scene::calcIntersection(float x, float y,
@@ -306,12 +288,12 @@ std::optional<float> Scene::calcIntersection(float x, float y,
 	return z;
 }
 
-glm::ivec3 Scene::calcPhong(const glm::vec3& point) const
+glm::ivec3 Scene::calcPhong(const glm::vec3& point, const glm::vec3& cameraPos) const
 {
 	Material material = m_ellipsoid.getMaterial();
 
 	glm::vec3 normalVector = m_ellipsoid.getNormalVector(point);
-	glm::vec3 viewVector = glm::normalize(m_camera.getPosition());
+	glm::vec3 viewVector = glm::normalize(cameraPos);
 	glm::vec3 lightVector = viewVector;
 
 	float ambient = material.ambientCoef;

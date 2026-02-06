@@ -1,45 +1,62 @@
 #include "window.hpp"
 
-#include "scene.hpp"
-#include "window_user_data.hpp"
+#include "shaderPrograms.hpp"
 
-#include <glad/glad.h>
-#include <glfw/glfw3.h>
-
+#include <cmath>
 #include <string>
 
-Window::Window(int initialWidth, int initialHeight, Scene& scene, Texture& texture)
+Window::Window()
 {
 	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	m_userData.scene = &scene;
-	m_userData.texture = &texture;
-	const std::string windowTitle = "ellipsoid-raycasting";
-	m_windowPtr = glfwCreateWindow(initialWidth, initialHeight, windowTitle.c_str(),
-		nullptr, nullptr);
-	glfwSetWindowUserPointer(m_windowPtr, &m_userData);
+	glfwWindowHint(GLFW_SAMPLES, 4);
+	static const std::string windowTitle = "ellipsoid-raycasting";
+	m_windowPtr = glfwCreateWindow(m_initialSize.x, m_initialSize.y, windowTitle.c_str(), nullptr,
+		nullptr);
+	glfwSetWindowUserPointer(m_windowPtr, this);
 	glfwMakeContextCurrent(m_windowPtr);
-	glfwSetFramebufferSizeCallback(m_windowPtr, resizeCallback);
-	glfwSetCursorPosCallback(m_windowPtr, cursorMovementCallback);
-	glfwSetScrollCallback(m_windowPtr, scrollCallback);
-	gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+	glfwSwapInterval(1);
+
+	glfwSetFramebufferSizeCallback(m_windowPtr, callbackWrapper<&Window::resizeCallback>);
+	glfwSetCursorPosCallback(m_windowPtr, callbackWrapper<&Window::cursorMovementCallback>);
+	glfwSetScrollCallback(m_windowPtr, callbackWrapper<&Window::scrollCallback>);
+
+	gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress));
+
+	updateViewport();
+	ShaderPrograms::init();
 }
 
-bool Window::shouldClose()
+Window::~Window()
+{
+	glfwTerminate();
+}
+
+void Window::init(Scene& scene)
+{
+	m_scene = &scene;
+}
+
+bool Window::shouldClose() const
 {
 	return glfwWindowShouldClose(m_windowPtr);
 }
 
-void Window::pollEvents()
+void Window::swapBuffers() const
+{
+	glfwSwapBuffers(m_windowPtr);
+}
+
+void Window::pollEvents() const
 {
 	glfwPollEvents();
 }
 
-void Window::swapBuffers()
+const glm::ivec2& Window::viewportSize() const
 {
-	glfwSwapBuffers(m_windowPtr);
+	return m_viewportSize;
 }
 
 GLFWwindow* Window::getPtr()
@@ -47,72 +64,90 @@ GLFWwindow* Window::getPtr()
 	return m_windowPtr;
 }
 
-void Window::resizeCallback(GLFWwindow* window, int width, int height)
+void Window::resizeCallback(int width, int height)
 {
 	if (width == 0 || height == 0)
 	{
 		return;
 	}
 
-	WindowUserData* userData = static_cast<WindowUserData*>(glfwGetWindowUserPointer(window));
-	userData->scene->rescale(width, height);
-	userData->texture->rescale(width, height);
-	glViewport(0, 0, width, height);
+	m_viewportSize = {width - LeftPanel::width, height};
+	m_scene->updateViewportSize();
+	updateViewport();
 }
 
-void Window::cursorMovementCallback(GLFWwindow* window, double x, double y)
+void Window::cursorMovementCallback(double x, double y)
 {
-	static float previousX{};
-	static float previousY{};
+	glm::vec2 currPos{static_cast<float>(x), static_cast<float>(y)};
+	glm::vec2 offset = currPos - m_lastCursorPos;
+	m_lastCursorPos = currPos;
 
-	float xOffset = x - previousX;
-	float yOffset = y - previousY;
-	previousX = x;
-	previousY = y;
-	
-	WindowUserData* windowUserData =
-		static_cast<WindowUserData*>(glfwGetWindowUserPointer(window));
-
-	if ((glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS &&
-		glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) ||
-		(glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_RELEASE &&
-		glfwGetKey(window, GLFW_KEY_RIGHT_ALT) == GLFW_RELEASE &&
-		glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_RELEASE &&
-		glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_RELEASE &&
-		glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS))
+	if ((!isKeyPressed(GLFW_KEY_LEFT_SHIFT) &&
+		isButtonPressed(GLFW_MOUSE_BUTTON_MIDDLE))
+		||
+		(isKeyPressed(GLFW_KEY_LEFT_ALT) &&
+		isButtonPressed(GLFW_MOUSE_BUTTON_LEFT)))
 	{
-		float sensitivity = 0.002f;
-		windowUserData->scene->addAzimuth(-sensitivity * xOffset);
-		windowUserData->scene->addElevation(sensitivity * yOffset);
+		static constexpr float sensitivity = 0.002f;
+		m_scene->addPitchCamera(-sensitivity * offset.y);
+		m_scene->addYawCamera(sensitivity * offset.x);
 	}
 
-	if ((glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
-		glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS) &&
-		glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS)
+	if ((isKeyPressed(GLFW_KEY_LEFT_SHIFT) &&
+		isButtonPressed(GLFW_MOUSE_BUTTON_MIDDLE))
+		||
+		(isKeyPressed(GLFW_KEY_RIGHT_SHIFT) &&
+		isButtonPressed(GLFW_MOUSE_BUTTON_LEFT)))
 	{
-		float sensitivity = 0.001f;
-		windowUserData->scene->moveX(-sensitivity * xOffset);
-		windowUserData->scene->moveY(sensitivity * yOffset);
+		static constexpr float sensitivity = 0.001f;
+		m_scene->moveXCamera(-sensitivity * offset.x);
+		m_scene->moveYCamera(sensitivity * offset.y);
 	}
 
-	if (glfwGetKey(window, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS &&
-		glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+	if (isKeyPressed(GLFW_KEY_RIGHT_ALT) &&
+		isButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
 	{
-		float sensitivity = 1.005f;
-		windowUserData->scene->zoom(std::pow(sensitivity, yOffset));
+		static constexpr float sensitivity = 1.005f;
+		m_scene->zoomCamera(std::pow(sensitivity, -offset.y));
 	}
 }
 
-void Window::scrollCallback(GLFWwindow* window, double, double yOffset)
+void Window::scrollCallback(double, double yOffset)
 {
-	WindowUserData* windowUserData =
-		static_cast<WindowUserData*>(glfwGetWindowUserPointer(window));
+	if (isCursorInGUI())
+	{
+		return;
+	}
 
-	float sensitivity = 1.1f;
-	windowUserData->scene->zoom(std::pow(sensitivity, -yOffset));
+	static constexpr float sensitivity = 1.1f;
+	m_scene->zoomCamera(std::pow(sensitivity, static_cast<float>(yOffset)));
 }
 
-Window::~Window()
+void Window::updateViewport() const
 {
-	glfwTerminate();
+	glViewport(LeftPanel::width, 0, m_viewportSize.x, m_viewportSize.y);
+}
+
+glm::vec2 Window::getCursorPos() const
+{
+	double x{};
+	double y{};
+	glfwGetCursorPos(m_windowPtr, &x, &y);
+	return {static_cast<float>(x), static_cast<float>(y)};
+}
+
+bool Window::isButtonPressed(int button)
+{
+	return glfwGetMouseButton(m_windowPtr, button) == GLFW_PRESS;
+}
+
+bool Window::isKeyPressed(int key)
+{
+	return glfwGetKey(m_windowPtr, key) == GLFW_PRESS;
+}
+
+bool Window::isCursorInGUI()
+{
+	glm::vec2 cursorPos = getCursorPos();
+	return cursorPos.x <= LeftPanel::width;
 }

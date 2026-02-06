@@ -1,23 +1,22 @@
 #pragma once
 
+#include <glm/glm.hpp>
+
 #include <vector>
 
 class Texture
 {
 public:
-	Texture(int initialWidth, int initialHeight);
-	void initialize();
+	Texture(const glm::ivec2& size);
 	void use() const;
 	void overwrite(const std::vector<unsigned char>& cpuTexture) const;
-	void rescale(int width, int height);
+	void rescale(const glm::ivec2& size);
 	~Texture();
 
 private:
-	bool m_isInitialized = false;
 	unsigned int m_id{};
-	int m_width{};
-	int m_height{};
-	
+	glm::ivec2 m_size{};
+
 	void create();
 	void destroy() const;
 };

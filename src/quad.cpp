@@ -1,4 +1,4 @@
-#include "canvas.hpp"
+#include "quad.hpp"
 
 #include <glad/glad.h>
 
@@ -7,13 +7,13 @@
 constexpr int vertexCount = 6;
 constexpr int vertexCoordinates = 3;
 
-Canvas::Canvas()
+Quad::Quad()
 {
-	std::array<float, vertexCount * vertexCoordinates> vertices =
+	static constexpr std::array<float, vertexCount * vertexCoordinates> vertices =
 	{
 		-1.0f, -1.0f, 0.0f,
-		-1.0f, 1.0f, 0.0f,
 		1.0f, 1.0f, 0.0f,
+		-1.0f, 1.0f, 0.0f,
 		-1.0f, -1.0f, 0.0f,
 		1.0f, -1.0f, 0.0f,
 		1.0f, 1.0f, 0.0f
@@ -30,7 +30,7 @@ Canvas::Canvas()
 	glBindVertexArray(0);
 }
 
-void Canvas::render()
+void Quad::render()
 {
 	glBindVertexArray(m_VAO);
 	glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(vertexCount * vertexCoordinates));
