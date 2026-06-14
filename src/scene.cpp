@@ -9,9 +9,9 @@
 #include <cmath>
 #include <cstddef>
 
-constexpr float nearPlane = 0.0f;
-constexpr float farPlane = 1000.0f;
-constexpr float initViewWidth = 20.0f;
+static constexpr float nearPlane = 0.0f;
+static constexpr float farPlane = 1000.0f;
+static constexpr float initViewWidth = 20.0f;
 
 Scene::Scene(const glm::ivec2& viewportSize) :
 	m_viewportSize{viewportSize},

@@ -9,7 +9,26 @@ constexpr int vertexCoordinates = 3;
 
 Quad::Quad()
 {
-	static constexpr std::array<float, vertexCount * vertexCoordinates> vertices =
+	createVBO();
+	createVAO();
+}
+
+Quad::~Quad()
+{
+	glDeleteVertexArrays(1, &m_VAO);
+	glDeleteBuffers(1, &m_VBO);
+}
+
+void Quad::render() const
+{
+	glBindVertexArray(m_VAO);
+	glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(vertexCount * vertexCoordinates));
+	glBindVertexArray(0);
+}
+
+void Quad::createVBO()
+{
+	static constexpr std::array<float, vertexCount * vertexCoordinates> vertices
 	{
 		-1.0f, -1.0f, 0.0f,
 		1.0f, 1.0f, 0.0f,
@@ -20,19 +39,20 @@ Quad::Quad()
 	};
 
 	glGenBuffers(1, &m_VBO);
-	glGenVertexArrays(1, &m_VAO);
-	glBindVertexArray(m_VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-	glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(vertices.size() * sizeof(float)), vertices.data(),
-		GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertexCoordinates * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-	glBindVertexArray(0);
+	glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size() * sizeof(float)),
+		vertices.data(), GL_STATIC_DRAW);
 }
 
-void Quad::render()
+void Quad::createVAO()
 {
+	glGenVertexArrays(1, &m_VAO);
 	glBindVertexArray(m_VAO);
-	glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(vertexCount * vertexCoordinates));
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertexCoordinates * sizeof(float),
+		reinterpret_cast<void*>(0));
+	glEnableVertexAttribArray(0);
+
 	glBindVertexArray(0);
 }
